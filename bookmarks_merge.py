@@ -67,9 +67,10 @@ class Bookmark:
 class Folder:
     """A folder node. The root folder has name None."""
 
-    def __init__(self, name=None, add_date=None):
+    def __init__(self, name=None, add_date=None, personal_toolbar_folder=False):
         self.name = name
         self.add_date = add_date
+        self.personal_toolbar_folder = personal_toolbar_folder
         self.children = []
 
     def __repr__(self):
@@ -154,7 +155,13 @@ class _BookmarkParser(HTMLParser):
                 self.stack.append(self.pending_folder)
                 self.pending_folder = None
         elif tag == "h3":
-            folder = Folder(name="", add_date=_parse_add_date(attrs.get("add_date")))
+            folder = Folder(
+                name="",
+                add_date=_parse_add_date(attrs.get("add_date")),
+                personal_toolbar_folder=(
+                    (attrs.get("personal_toolbar_folder") or "").lower() == "true"
+                ),
+            )
             self.stack[-1].children.append(folder)
             self.pending_folder = folder
             self.collecting = folder
@@ -250,6 +257,9 @@ def merge_trees(trees, dedup=True, keep_newest=False):
                 if existing is None:
                     existing = Folder(name=child.name, add_date=child.add_date)
                     dst.children.append(existing)
+                existing.personal_toolbar_folder = (
+                    existing.personal_toolbar_folder or child.personal_toolbar_folder
+                )
                 merge_folder(child, existing, path + (child.name.strip(),))
             else:
                 key = normalize_url(child.url) if dedup else None
@@ -310,7 +320,7 @@ def render_html(root):
     """Render a merged tree as Netscape bookmark HTML.
 
     The output re-imports cleanly: DOCTYPE, a top-level DL, H3 folder
-    headers with ADD_DATE, and A entries with HREF and ADD_DATE.
+    headers with ADD_DATE and toolbar flags, and A entries with HREF and ADD_DATE.
     """
     lines = [
         "<!DOCTYPE NETSCAPE-Bookmark-file-1>",
@@ -332,8 +342,14 @@ def render_html(root):
                     if child.add_date is not None
                     else ""
                 )
+                toolbar = (
+                    ' PERSONAL_TOOLBAR_FOLDER="true"'
+                    if child.personal_toolbar_folder
+                    else ""
+                )
                 lines.append(
-                    "%s<DT><H3%s>%s</H3>" % (pad, date, _escape(child.name))
+                    "%s<DT><H3%s%s>%s</H3>"
+                    % (pad, date, toolbar, _escape(child.name))
                 )
                 lines.append("%s<DL><p>" % pad)
                 render_folder(child, indent + 1)

@@ -122,9 +122,11 @@ distinct bookmark. Relative links and non-HTTP schemes (such as
 - ADD_DATE values that are missing or not numbers are treated as
   unknown; with `--keep-newest`, a duplicate with an unknown date
   never replaces a kept entry.
-- Folder icons, toolbar flags and other browser-specific attributes
-  are not preserved: the output carries HREF, title and ADD_DATE
-  only, which is everything browsers need for a clean re-import.
+- The `PERSONAL_TOOLBAR_FOLDER="true"` flag is preserved on folders.
+  When folders merge, the flag is kept if either source marks the folder
+  as a toolbar. Ordinary folders remain unflagged.
+- Folder icons and other browser-specific attributes are not preserved:
+  the output carries HREF, title, ADD_DATE and the toolbar flag.
 
 ## Development
 

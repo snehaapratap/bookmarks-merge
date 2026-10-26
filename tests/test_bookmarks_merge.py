@@ -252,3 +252,53 @@ def test_cli_report_file_and_missing_input(tmp_path):
     assert report["merged_bookmarks"] == 1
     assert bm.main([str(tmp_path / "nope.html")]) == 2
     assert bm.main([]) == 2
+
+
+# Toolbar folders must retain their browser import role, regardless of source order.
+def test_toolbar_flag_survives_merge_from_either_source():
+    for flags in ((True, False), (False, True), (True, True), (False, False)):
+        trees = []
+        for index, flagged in enumerate(flags):
+            markup = folder("Toolbar" if index == 0 else "toolbar",
+                            link("https://example.com/%d" % index), date=123)
+            if flagged:
+                markup = markup.replace("<H3", '<H3 PERSONAL_TOOLBAR_FOLDER="true"')
+            root, errors = bm.parse_bookmarks(doc(markup))
+            assert errors == []
+            trees.append((str(index), root))
+        merged, duplicates = bm.merge_trees(trees)
+        output = bm.render_html(merged)
+        assert ('PERSONAL_TOOLBAR_FOLDER="true"' in output) == any(flags)
+        again, errors = bm.parse_bookmarks(output)
+        assert errors == []
+        assert len(again.children) == 1
+        assert again.children[0].personal_toolbar_folder == any(flags)
+        assert again.children[0].name == "Toolbar"
+        assert again.children[0].add_date == 123
+        assert len(again.children[0].children) == 2
+        assert duplicates == []
+
+
+def test_toolbar_flag_does_not_leak_to_parent_or_sibling():
+    markup = folder("Outer", folder("Toolbar", link("https://example.com")))
+    markup = markup.replace("<H3>Toolbar", '<H3 PERSONAL_TOOLBAR_FOLDER="TRUE">Toolbar')
+    root, errors = bm.parse_bookmarks(doc(markup + folder("Other", "")))
+    assert errors == []
+    merged, _ = bm.merge_trees([("a", root)])
+    output = bm.render_html(merged)
+    assert output.count('PERSONAL_TOOLBAR_FOLDER="true"') == 1
+    again, _ = bm.parse_bookmarks(output)
+    assert not again.children[0].personal_toolbar_folder
+    assert again.children[0].children[0].personal_toolbar_folder
+    assert not again.children[1].personal_toolbar_folder
+
+
+def test_false_and_valueless_toolbar_attributes_are_not_flags():
+    root, errors = bm.parse_bookmarks(doc(
+        '<DT><H3 PERSONAL_TOOLBAR_FOLDER="false">False</H3><DL></DL>'
+        '<DT><H3 PERSONAL_TOOLBAR_FOLDER>Missing value</H3><DL></DL>'
+    ))
+    assert errors == []
+    merged, _ = bm.merge_trees([("a", root)])
+    assert "PERSONAL_TOOLBAR_FOLDER" not in bm.render_html(merged)
+    assert all(not child.personal_toolbar_folder for child in merged.children)
