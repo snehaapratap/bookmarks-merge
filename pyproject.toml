@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bookmarks-merge"
+version = "1.0.0"
+description = "Merge cross-browser bookmark HTML exports into one deduped file that re-imports cleanly"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+
+[project.scripts]
+bookmarks-merge = "bookmarks_merge:main"
+
+[tool.setuptools]
+py-modules = ["bookmarks_merge"]
